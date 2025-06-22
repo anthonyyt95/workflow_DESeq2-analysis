@@ -1,0 +1,12 @@
+CpG-Lys_gBdnf-A_S7	2
+CpG-Lys_gBdnf-B_S8	2
+CpG-Lys_gBdnf-D_S12	2
+CpG_gBdnf-A_S3	2
+CpG_gBdnf-B_S4	2
+CpG_gBdnf-D_S10	2
+CpG_gSlc7a1-A_S1	1
+CpG_gSlc7a1-B_S2	1
+CpG_gSlc7a1-D_S9	1
+CpGplusLys_gSlc7a1-A_S5	1
+CpGplusLys_gSlc7a1-B_S6	1
+CpGplusLys_gSlc7a1-D_S11	1

@@ -1,0 +1,428 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Setup
+```{r}
+setwd("C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\R")
+
+library(DESeq2)
+library(stringr)
+library(reshape)
+library(scales)
+library(xlsx)
+```
+
+Perform DE
+```{r}
+
+
+countsFile <- "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\Data\\counts.txt"
+geneRefFile <- "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\Data\\genes.txt"
+DESeqMatFile <- "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\Data\\DESeq2Layout.txt"
+#outputFile <- "DE_NoLys-v-Lys.txt"
+outputFile <- "test.txt"
+
+# Load data
+values <- read.delim(countsFile,
+                    sep='\t',
+                    header=FALSE)
+genes <- read.delim(geneRefFile,
+                   header=FALSE,
+                   sep="\t")
+DESeqMat <- read.table(DESeqMatFile,
+                       header=FALSE,
+                       sep="\t")
+
+# Processes data
+values <- values[,-1]
+values <- values[-1,]
+
+geneLen <- genes[,3]
+genes <- genes[,2]
+genes <- make.unique(genes)
+conditions <- DESeqMat[,1]
+
+
+# Converts values-character to values-numeric
+values <- as.matrix(values)
+tmp <- as.numeric(values)
+values <- matrix(tmp,
+                 ncol=ncol(values))
+rownames(values) <- genes
+colnames(values) <- conditions
+
+
+# Acquires relevant conditions and creates design matrix
+locA <- which(DESeqMat[,2] == 1)
+locB <- which(DESeqMat[,2] == 2)
+values <- values[,c(locA,locB)]
+#repData <- DESeqMat[c(locA,locB),3]
+conditions <- conditions[c(locA,locB)]
+c1 <- rep('A',length(locA))
+c2 <- rep('B',length(locB))
+coldata <- c(c1,c2)
+coldata <- as.matrix(coldata)
+#coldata <- cbind(coldata,repData)
+
+
+rownames(coldata) <- conditions
+colnames(coldata) <- c('condition')
+
+# Creates DESEQ2 object
+dds <- DESeqDataSetFromMatrix(countData = values,
+                              colData = coldata,
+                              design = ~ condition)
+dds <- DESeq(dds)
+normCounts <- counts(dds,
+                     normalized=TRUE)
+
+# Performs DE analysis
+res <- results(dds)
+res <- as.data.frame(res)
+
+# Removes rows without a padj
+exclude <- which(is.na(res$padj))
+res <- res[-exclude,]
+
+# Re-orders based on p-value
+ind <- order(res$padj,
+             decreasing=FALSE)
+res <- res[ind,]
+
+# Writes results
+write.table(res,
+            file=outputFile,
+            col.names=TRUE,
+            row.names=TRUE,
+            append=FALSE,
+            sep="\t")
+write.table(normCounts,
+            file=paste('DESeq2Norm',
+                       outputFile,
+                       sep="_"),
+            col.names=TRUE,
+            row.names=TRUE,
+            append=FALSE,
+            sep="\t")
+
+
+
+```
+
+Converts count file to TPM
+```{r}
+
+countsFile <- "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\Data\\counts.txt"
+geneRefFile <- "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\Data\\genes.txt"
+
+# Load data
+values <- read.delim(countsFile,
+                    sep='\t',
+                    header=FALSE)
+genes <- read.delim(geneRefFile,
+                   header=FALSE,
+                   sep="\t")
+
+# Processes data
+values <- values[,-1]
+conditions <- values[1,]
+colnames(values) <- conditions
+values <- values[-1,]
+
+geneLen <- genes[,3]
+genes <- genes[,2]
+genes <- make.unique(genes)
+rownames(values) <- genes
+
+# Converts values-character to values-numeric
+values <- as.matrix(values)
+tmp <- as.numeric(values)
+values <- matrix(tmp,
+                 ncol=ncol(values))
+
+# Separately calculates TPM for all genes
+tpmVal <- values/(geneLen/10^3)
+tpmVal <- as.matrix(tpmVal)
+normFac <- colSums(tpmVal,
+                   na.rm=TRUE)
+for (i in 1:length(normFac)) {
+  val <- tpmVal[,i]/(normFac[i]/10^6)
+  tpmVal[,i] <- val
+}
+rownames(tpmVal) <- genes
+colnames(tpmVal) <- conditions
+
+write.table(tpmVal,
+            file="tpm.txt",
+            col.names=TRUE,
+            row.names=TRUE,
+            append=FALSE,
+            sep="\t")
+
+
+```
+
+
+Perform DE (of Combat-seq counts)
+```{r}
+
+countsFile <- "E:\\Documents\\NYU\\NYU Langone\\PhD\\Feske Lab\\Experiments\\2021.08.21_Atp2a2\\Data\\20220202_RNAseqData\\Data\\2022.02.17_DESeq2_COMBAT\\counts_gAtp2a2-v-gBdnf_COMBAT.txt"
+geneRefFile <- "E:\\Documents\\NYU\\NYU Langone\\PhD\\Feske Lab\\Experiments\\2021.08.21_Atp2a2\\Data\\20220202_RNAseqData\\output\\genes.txt"
+DESeqMatFile <- "E:\\Documents\\NYU\\NYU Langone\\PhD\\Feske Lab\\Experiments\\2021.08.21_Atp2a2\\Data\\20220202_RNAseqData\\Data\\2022.02.17_DESeq2_COMBAT\\DESeq2Layout.txt"
+outputFile <- "DeseqNorm_gAtp2a2-v-gBdnf.txt"
+
+# Load data
+values <- read.delim(countsFile,
+                    sep='\t',
+                    header=FALSE)
+genes <- read.delim(geneRefFile,
+                   header=FALSE,
+                   sep="\t")
+DESeqMat <- read.table(DESeqMatFile,
+                       header=FALSE,
+                       sep="\t")
+
+# Processes data
+values <- values[,-1]
+values <- values[-1,]
+
+geneLen <- genes[,3]
+genes <- genes[,2]
+genes <- make.unique(genes)
+conditions <- DESeqMat[,1]
+
+
+# Converts values-character to values-numeric
+values <- as.matrix(values)
+tmp <- as.numeric(values)
+values <- matrix(tmp,
+                 ncol=ncol(values))
+rownames(values) <- genes
+colnames(values) <- conditions
+
+
+# Acquires relevant conditions and creates design matrix
+cond <- factor(DESeqMat[,2])
+repl <- factor(DESeqMat[,3])
+coldata <- data.frame(cond,repl)
+
+rownames(coldata) <- conditions
+colnames(coldata) <- c('condition','replicate')
+
+# Creates DESEQ2 object
+dds <- DESeqDataSetFromMatrix(countData = values,
+                              colData = coldata,
+                              design = ~ replicate + condition)
+dds <- DESeq(dds)
+normCounts <- counts(dds,
+                     normalized=TRUE)
+
+# Performs DE analysis
+res <- results(dds)
+res <- as.data.frame(res)
+
+# Removes rows without a padj
+exclude <- which(is.na(res$padj))
+res <- res[-exclude,]
+
+# Re-orders based on p-value
+ind <- order(res$padj,
+             decreasing=FALSE)
+res <- res[ind,]
+
+# Writes results
+write.table(res,
+            file=outputFile,
+            col.names=TRUE,
+            row.names=TRUE,
+            append=FALSE,
+            sep="\t")
+write.table(normCounts,
+            file=paste('counts',
+                       outputFile,
+                       sep="_"),
+            col.names=TRUE,
+            row.names=TRUE,
+            append=FALSE,
+            sep="\t")
+
+
+```
+
+
+Performs PCA analysis
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(Rtsne)
+
+expr_data = "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\R\\TPM_Norm.txt"
+#expr_data = "C:\\Users\\antho\\OneDrive\\Desktop\\Misc\\20240727_Sc7a1_RNAseq\\R\\DESeq2Norm.txt"
+top_gene_num = 1000;
+
+
+expr_data = read.table(expr_data,
+                       header=FALSE,
+                       sep="\t")
+samps = expr_data[1,c(2:length(expr_data[1,]))]
+genes = expr_data[c(2:length(expr_data[,1])),1]
+expr_data = expr_data[c(2:length(expr_data[,1])),
+                      c(2:length(expr_data[1,]))]
+
+
+# Converts to numeric
+expr_data <- expr_data %>%
+  mutate(across(everything(), as.numeric))
+
+
+# Removes NA values
+tmp = expr_data[,1]
+exclude = which(is.na(tmp))
+if (!(length(exclude)==0)) {
+  expr_data = expr_data[-exclude,]
+  genes = genes[-exclude]
+}
+
+
+# Adds gene and sample names to `expr_data`
+colnames(expr_data) = samps
+rownames(expr_data) = make.unique(genes)
+
+
+# Filters out lowly expressed genes
+avg_list = rowMeans(expr_data);
+exclude = which(avg_list < 10);
+expr_data = expr_data[-exclude,]
+genes = genes[-exclude]
+
+# Filters out genes that start with Gm
+exclude = c()
+for (i in 1:length(genes)) {
+  gene = genes[i]
+  
+  is_gm = grepl("Gm", gene)
+  is_mir = grepl("Mir", gene)
+  is_rik = grepl("Rik", gene)
+  is_ps = grepl("-ps", gene)
+  if (is_gm) {
+    exclude = c(exclude, i)
+  } else if (is_mir) {
+    exclude = c(exclude, i)
+  } else if (is_rik) {
+    exclude = c(exclude, i)
+  } else if (is_ps) {
+    exclude = c(exclude, i)
+  }
+}
+expr_data = expr_data[-exclude,]
+genes = genes[-exclude]
+
+
+# Acquires most variable genes
+std_list = apply(expr_data, 1, sd, na.rm=TRUE)
+pca_ind = order(std_list,
+                decreasing=TRUE)
+pca_ind = pca_ind[c(1:top_gene_num)]
+expr_data = expr_data[pca_ind,]
+
+
+# Performs PCA plot
+pcaData = t(expr_data)
+pcaData = log2(pcaData+1)
+
+pca_result = prcomp(pcaData,
+                    center=TRUE,
+                    scale.=FALSE)
+
+pca_scores = as.data.frame(pca_result$x)
+pca_scores$groups = c("1","1","1","2","2","2","3","3","3","4","4","4")
+
+explained = round(100 * summary(pca_result)$importance[2,1:3], 1)
+
+
+# Performs tSne
+set.seed(42)
+tsne_out = Rtsne(pcaData,
+                 perplexity = 1,
+                 theta = 0.5,
+                 dims = 2,
+                 verbose=TRUE)
+tsne_out = data.frame(tsne_out$Y)
+colnames(tsne_out) = c("tSNE1", "tSNE2")
+tsne_out$groups = c("1","1","1","2","2","2","3","3","3","4","4","4")
+
+
+
+# 2-D PCA plot: PC1 vs PC2
+pca_colors = c(
+  rgb(0.7, 0, 0.8),
+  rgb(0.9, 0.2, 0.7),
+  rgb(0.5, 0.5, 0.5),
+  rgb(0, 0, 0)
+)
+
+plot_title = "TPM"
+
+pca_fig = ggplot(pca_scores, 
+                 aes(x = PC1, 
+                     y = PC2, 
+                     color = groups)) + 
+  geom_point(size = 5) + 
+  scale_color_manual(values = pca_colors) + 
+  theme_bw() + 
+  theme(
+    axis.title = element_text(size=20),
+    axis.text = element_text(size=20),
+    plot.title = element_text(size=20, face="bold")
+  ) +
+  labs(
+    title = paste('Flux PCA: ',plot_title, sep=""),
+    x = paste0("PC1 (", explained[1], "%)"),
+    y = paste0("PC2 (", explained[2], "%)")
+  )
+
+pca_fig
+
+
+
+tsne_fig = ggplot(tsne_out, 
+                 aes(x = tSNE1, 
+                     y = tSNE2, 
+                     color = groups)) + 
+  geom_point(size = 5) + 
+  scale_color_manual(values = pca_colors) + 
+  theme_bw() + 
+  theme(
+    axis.title = element_text(size=20),
+    axis.text = element_text(size=20),
+    plot.title = element_text(size=20, face="bold")
+  ) +
+  labs(
+    title = paste('Flux PCA: ',plot_title, sep=""),
+    x = paste0("PC1 (", explained[1], "%)"),
+    y = paste0("PC2 (", explained[2], "%)")
+  )
+
+
+
+ggsave(paste('flux_pca',hist_title,'.pdf', sep=""),
+       plot = pca_fig,
+       width = 5, height = 5, units = "in")
+
+
+
+
+
+
+```
+
+
+
+
